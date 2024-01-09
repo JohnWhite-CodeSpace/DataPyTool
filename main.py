@@ -1,4 +1,4 @@
-
+import math
 import os.path
 import threading
 import time
@@ -174,7 +174,7 @@ class MainWindow(QMainWindow):
             self.sc.axes.autoscale()
             self.sc.draw()
             self.Terminal.append(f"Min values: (x,y) = ({min(Datax)}, {min(Datay)})")
-            self.Terminal.append(f"Min values: (x,y) = ({max(Datax)}, {max(Datay)})")
+            self.Terminal.append(f"Max values: (x,y) = ({max(Datax)}, {max(Datay)})")
         else:
             self.Terminal.append("First open Table Viewer and choose data for plotting.")
 
@@ -197,18 +197,25 @@ class MainWindow(QMainWindow):
                     ModDatax = np.sort(ModDatax)  # Ensure Datax is sorted
                     stacked_x = np.vstack([ModDatax, ModDatax - 1, ModDatax + 1]).T
                     coeffs = np.polyfit(stacked_x[:, 0], Datay[self.minValue: self.maxValue], deg)
+                    coeffs[0] = 6 * coeffs[0]
+                    coeffs[1] = 2 * coeffs[1]
+                    R = Datax[Datay.index(min(Datay))]
+                    print(f"{coeffs}")
                     x2 = np.arange(min(ModDatax) - 1, max(ModDatax) + 1, 0.01)
-                    y2 = np.polyval(coeffs, x2)
+                    y2 = np.polyval(coeffs, x2)-min(Datay)
                 else:
                     Datax, Datay = self.windows.GetDataset()
-                    Datax = np.sort(Datax)  # Ensure Datax is sorted
+                    Datax = np.sort(Datax)
                     stacked_x = np.vstack([Datax, Datax - 1, Datax + 1]).T
                     coeffs = np.polyfit(stacked_x[:, 0], Datay, deg)
+                    coeffs[0] = 6 * coeffs[0]
+                    coeffs[1] = 2 * coeffs[1]
+                    print(f"{coeffs}")
                     x2 = np.arange(min(Datax) - 1, max(Datax) + 1, 0.01)
-                    y2 = np.polyval(coeffs, x2)
-
-                self.sc.axes.plot(x2, y2, label=f"deg={deg}",color="red")
+                    y2 = np.polyval(coeffs, x2) - min(Datay)
+                self.sc.axes.plot(x2, y2, label=f"deg={deg}", color="red")
                 self.sc.axes.autoscale()
+                self.sc.axes.legend()
                 equation = f"Polynomial Equation: "
                 for i in range(deg, -1, -1):
                     coefficient = coeffs[deg - i]
@@ -221,7 +228,7 @@ class MainWindow(QMainWindow):
 
                 self.Terminal.append(equation)
                 self.Terminal.append(f"Min values: (x,y) = ({min(Datax)},{min(Datay)})")
-                self.Terminal.append(f"Min values: (x,y) = ({max(Datax)},{max(Datay)})")
+                self.Terminal.append(f"Max values: (x,y) = ({max(Datax)},{max(Datay)})")
                 self.sc.draw()
 
             else:
