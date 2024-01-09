@@ -2,6 +2,7 @@
 import os.path
 import threading
 import time
+import keyboard
 import TableViewer as tv
 from matplotlib.ticker import MaxNLocator
 from PyQt5 import QtCore, QtWidgets, QtGui, Qt
@@ -25,21 +26,37 @@ class MplCanvas(FigureCanvasQTAgg):
         self.axes = fig.add_subplot()
         super(MplCanvas, self).__init__(fig)
 
+class KeyHelper(QtCore.QObject):
+    keyPressed = QtCore.pyqtSignal(QtCore.Qt.Key)
+
+    def __init__(self, window):
+        super().__init__(window)
+        self._window = window
+
+        self.window.installEventFilter(self)
+
+    @property
+    def window(self):
+        return self._window
+
+    def eventFilter(self, obj, event):
+        if obj is self.window and event.type() == QtCore.QEvent.KeyPress:
+            self.keyPressed.emit(event.key())
+        return super().eventFilter(obj, event)
 class MainWindow(QMainWindow):
     update_progress_signal = pyqtSignal(int, int)
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None):
+        super().__init__(parent)
         self.sorted_dir = None
         self.windows = None
         self.DataX = None
         self.DataY = None
         self.minValue = 0
         self.maxValue = 0
-        self.setMinimumSize(QSize(1200, 800))
+        self.setMinimumSize(QSize(1000, 800))
         self.setWindowTitle("Simple Data Analizer")
         self.update_progress_signal.connect(self.update_progress)
-
         Plotbutton = QPushButton('Simple Data Analizer', self)
         Plotbutton.clicked.connect(self.InitDataPlotting)
         Plotbutton.resize(160, 80)
@@ -106,7 +123,7 @@ class MainWindow(QMainWindow):
         TermLabel.move(10, 490)
 
         self.Terminal = QTextEdit('', self)
-        self.Terminal.resize(1180, 230)
+        self.Terminal.resize(980, 230)
         self.Terminal.move(10, 520)
         self.Terminal.setStyleSheet("background-color : #FFFFFF")
         self.Create_MenuBar()
@@ -121,10 +138,10 @@ class MainWindow(QMainWindow):
 
         self.widget = QtWidgets.QWidget(self)
         self.widget.setLayout(layout)
-        self.widget.setGeometry(250, 15, 900, 500)
+        self.widget.setGeometry(250, 15, 750, 500)
 
         self.ProgressBar = QProgressBar(self)
-        self.ProgressBar.resize(1195,15)
+        self.ProgressBar.resize(980,15)
         self.ProgressBar.move(10,780)
 
         self.Progress = QLabel("Plotting progress", self)
@@ -143,8 +160,11 @@ class MainWindow(QMainWindow):
         plot1action.triggered.connect(self.HandlePlot1)
         self.pitem1 = plotMenu.addAction(plot1action)
         helpMenu = menubar.addMenu("&Help")
-        hitem1 = helpMenu.addAction("Open Manual")
-        hitem2 = helpMenu.addAction("Open Documentation")
+        SbSaction = QAction("Side by side view", self)
+        SbSaction.triggered.connect(self.SideBySide)
+        self.hitem1 = helpMenu.addAction(SbSaction)
+        hitem2 = helpMenu.addAction("Open Manual")
+        hitem3 = helpMenu.addAction("Open Documentation")
 
     def HandlePlot1(self):
         if self.windows is not None:
@@ -229,12 +249,8 @@ class MainWindow(QMainWindow):
     def onTextChanged(self, sender, num):
         if self.windows is not None:
             Datax, Datay = self.windows.GetDataset()
-            # This method will be called each time the text in QLineEdit changes
             try:
-                # Try to convert the text to an integer
                 number = int(sender.text())
-
-                print(f"You entered a number: {number}")
                 if num==1 and number<len(Datax):
                     self.ShowPolyDegMin.setText(f"{Datax[number]}")
                     self.minValue = number
@@ -243,26 +259,24 @@ class MainWindow(QMainWindow):
                     self.maxValue = number
 
             except ValueError:
-                # Handle the case where the entered text is not a valid integer
                 print("Invalid input. Please enter a number.")
 
-    def keyPressEvent(self, event):
-        if event.key() == Qt.Key_T and event.modifiers() == Qt.ControlModifier:
-            print("check0")
-            self.resize_windows()  # Make sure to call the correct method
+    def SideBySide(self):
+        self.resize_windows()
 
+    def handle_key_pressed(self, key):
+        if key in (QtCore.Qt.Key_T, QtCore.Qt.Key_Return):
+            self.SideBySide()
 
-def resize_windows(self):
-    desktop = QDesktopWidget().screenGeometry()
-
-    window_width = desktop.width() // 2
-    window_height = desktop.height()
-
-    if self.windows is not None:
-        self.setGeometry(0, 0, window_width - 5, window_height)
-        self.windows.setGeometry(window_width, 0, window_width, window_height)
-    else:
-        self.setGeometry(0, 0, window_width - 5, window_height)
+    def resize_windows(self):
+        desktop = QDesktopWidget().screenGeometry()
+        window_width = desktop.width() // 2
+        window_height = desktop.height()
+        if self.windows is not None:
+            self.setGeometry(0, 40, window_width - 5, window_height)
+            self.windows.setGeometry(window_width+50, 40, window_width-50 , window_height)
+        else:
+            self.setGeometry(0,40, window_width - 100, window_height)
 
 
 
@@ -272,9 +286,11 @@ def refresh_text_box(self, MYSTRING):
     app.QApplication.processEvents()  # update gui for pyqt
 
 
-
 if __name__ == "__main__":
+
     app = QtWidgets.QApplication(sys.argv)
     main_window = MainWindow()
     main_window.show()
+    helper = KeyHelper(main_window.windowHandle())
+    helper.keyPressed.connect(main_window.handle_key_pressed)
     sys.exit(app.exec_())

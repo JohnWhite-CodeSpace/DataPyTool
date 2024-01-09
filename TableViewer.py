@@ -1,5 +1,4 @@
 import time
-
 from PyQt5.QtCore import QSize
 
 #import PlotHandler
@@ -39,7 +38,7 @@ class DataTableView(QWidget):
         self.selectedX_rows = None
         self.selectedX_columns = None
         self.selectedX_indexes = None
-        self.setMinimumSize(QSize(900, 600))
+        self.setMinimumSize(QSize(800, 600))
         self.setWindowTitle("Data Table Viewer")
 
 
@@ -100,7 +99,7 @@ class DataTableView(QWidget):
         layout.addWidget(self.table)
         self.widget = QtWidgets.QWidget(self)
         self.widget.setLayout(layout)
-        self.widget.setGeometry(350, 15, 800, 650)
+        self.widget.setGeometry(350, 15, 500, 650)
 
         self.selection_info_label = QLabel("Selected Columns and Rows:", self)
         layout.addWidget(self.selection_info_label)
