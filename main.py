@@ -8,10 +8,10 @@ from matplotlib.ticker import MaxNLocator
 from PyQt5 import QtCore, QtWidgets, QtGui, Qt
 from PyQt5.QtWidgets import QMainWindow, QLabel, QGridLayout, QWidget, QTextEdit, QPushButton, QFileDialog, QDialog, \
     QMenuBar, QMenu, QAction, QProgressBar, QVBoxLayout, QLineEdit, QDesktopWidget
-from PyQt5.QtCore import QSize, QTimer, QObject, pyqtSignal
+from PyQt5.QtCore import QSize, QTimer, QObject, pyqtSignal, Qt
 from PyQt5.QtGui import *
 import subprocess
-
+import scipy as sp
 import sys
 import matplotlib
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT as NavigationToolbar
@@ -22,9 +22,9 @@ import numpy as np
 class MplCanvas(FigureCanvasQTAgg):
 
     def __init__(self, parents = None, width=5, height=4, dpi=100):
-        fig = Figure(figsize=(width, height), dpi=dpi)
-        self.axes = fig.add_subplot()
-        super(MplCanvas, self).__init__(fig)
+        self.fig = Figure(figsize=(width, height), dpi=dpi)
+        self.axes = self.fig.add_subplot()
+        super(MplCanvas, self).__init__(self.fig)
 
 class KeyHelper(QtCore.QObject):
     keyPressed = QtCore.pyqtSignal(QtCore.Qt.Key)
@@ -54,7 +54,7 @@ class MainWindow(QMainWindow):
         self.DataY = None
         self.minValue = 0
         self.maxValue = 0
-        self.setMinimumSize(QSize(1000, 800))
+        self.setMinimumSize(QSize(1000, 1000))
         self.setWindowTitle("Simple Data Analizer")
         self.update_progress_signal.connect(self.update_progress)
         Plotbutton = QPushButton('Simple Data Analizer', self)
@@ -88,6 +88,11 @@ class MainWindow(QMainWindow):
         self.PolyDegMin.move(65, 280)
         self.PolyDegMin.textChanged.connect(lambda: self.onTextChanged(self.PolyDegMin,1))
 
+        DeriveButton = QPushButton('Derive function', self)
+        DeriveButton.clicked.connect(self.CalculateDerivativeForPlot)
+        DeriveButton.resize(160, 80)
+        DeriveButton.move(10, 430)
+
         L3 = QLabel('From val1:', self)
         L3.resize(60, 20)
         L3.move(10, 302)
@@ -120,11 +125,11 @@ class MainWindow(QMainWindow):
 
         TermLabel = QLabel('Terminal', self)
         TermLabel.resize(200, 30)
-        TermLabel.move(10, 490)
+        TermLabel.move(10, 690)
 
         self.Terminal = QTextEdit('', self)
         self.Terminal.resize(980, 230)
-        self.Terminal.move(10, 520)
+        self.Terminal.move(10, 720)
         self.Terminal.setStyleSheet("background-color : #FFFFFF")
         self.Create_MenuBar()
 
@@ -138,15 +143,42 @@ class MainWindow(QMainWindow):
 
         self.widget = QtWidgets.QWidget(self)
         self.widget.setLayout(layout)
-        self.widget.setGeometry(250, 15, 750, 500)
+        self.widget.setGeometry(250, 15, 750, 600)
 
         self.ProgressBar = QProgressBar(self)
         self.ProgressBar.resize(980,15)
-        self.ProgressBar.move(10,780)
+        self.ProgressBar.move(10,980)
 
         self.Progress = QLabel("Plotting progress", self)
         self.Progress.resize(800, 30)
-        self.Progress.move(10, 750)
+        self.Progress.move(10, 950)
+
+        L5 = QLabel("Label to x axis", self)
+        L5.resize(120,20)
+        L5.move(300,610)
+
+        self.XLabel = QLineEdit(self)
+        self.XLabel.resize(200, 20)
+        self.XLabel.move(300, 630)
+        self.XLabel.textChanged.connect(self.SetXLabel)
+
+        L6 = QLabel("Label to y axis", self)
+        L6.resize(120,20)
+        L6.move(530,610)
+
+        self.YLabel= QLineEdit(self)
+        self.YLabel.resize(200, 20)
+        self.YLabel.move(530, 630)
+        self.YLabel.textChanged.connect(self.SetYLabel)
+
+        L7 = QLabel("Title to plot:", self)
+        L7.resize(100,20)
+        L7.move(760,610)
+
+        self.PlotTitle = QLineEdit(self)
+        self.PlotTitle.resize(200, 20)
+        self.PlotTitle.move(760, 630)
+        self.PlotTitle.textChanged.connect(self.SetPlotTitle)
 
 
     def Create_MenuBar(self):
@@ -172,6 +204,8 @@ class MainWindow(QMainWindow):
             self.sc.axes.cla()
             self.sc.axes.scatter(Datax, Datay,2)
             self.sc.axes.autoscale()
+            # ysmoothed = sp.ndimage.gaussian_filter1d(Datay,sigma=1)
+            # self.sc.axes.plot(Datax, ysmoothed, color='red')
             self.sc.draw()
             self.Terminal.append(f"Min values: (x,y) = ({min(Datax)}, {min(Datay)})")
             self.Terminal.append(f"Max values: (x,y) = ({max(Datax)}, {max(Datay)})")
@@ -189,7 +223,8 @@ class MainWindow(QMainWindow):
         if self.windows is not None:
             Datax, Datay = self.windows.GetDataset()
             self.sc.axes.cla()
-            self.sc.axes.scatter(Datax, Datay, 2)
+            self.sc.axes.scatter(Datax, Datay, 2, label="Experimental data")
+
             self.sc.axes.autoscale()
             if deg is not None:
                 if self.minValue!=0 and self.maxValue!=0 and self.minValue < self.maxValue < len(Datax):
@@ -197,9 +232,8 @@ class MainWindow(QMainWindow):
                     ModDatax = np.sort(ModDatax)  # Ensure Datax is sorted
                     stacked_x = np.vstack([ModDatax, ModDatax - 1, ModDatax + 1]).T
                     coeffs = np.polyfit(stacked_x[:, 0], Datay[self.minValue: self.maxValue], deg)
-                    coeffs[0] = 6 * coeffs[0]
-                    coeffs[1] = 2 * coeffs[1]
                     R = Datax[Datay.index(min(Datay))]
+                    coeffs[3] = coeffs[3] + +min(Datay)
                     print(f"{coeffs}")
                     x2 = np.arange(min(ModDatax) - 1, max(ModDatax) + 1, 0.01)
                     y2 = np.polyval(coeffs, x2)-min(Datay)
@@ -208,12 +242,12 @@ class MainWindow(QMainWindow):
                     Datax = np.sort(Datax)
                     stacked_x = np.vstack([Datax, Datax - 1, Datax + 1]).T
                     coeffs = np.polyfit(stacked_x[:, 0], Datay, deg)
-                    coeffs[0] = 6 * coeffs[0]
-                    coeffs[1] = 2 * coeffs[1]
+                    coeffs[3] = coeffs[3] + min(Datay)
                     print(f"{coeffs}")
                     x2 = np.arange(min(Datax) - 1, max(Datax) + 1, 0.01)
                     y2 = np.polyval(coeffs, x2) - min(Datay)
-                self.sc.axes.plot(x2, y2, label=f"deg={deg}", color="red")
+                self.sc.axes.plot(x2, y2, label=f"Polynomial fit (degree: {deg})", color="red")
+
                 self.sc.axes.autoscale()
                 self.sc.axes.legend()
                 equation = f"Polynomial Equation: "
@@ -253,6 +287,17 @@ class MainWindow(QMainWindow):
             self.windows = tv.DataTableView()
         self.windows.show()
 
+    def CalculateDerivativeForPlot(self):
+        Datax, Datay = self.windows.GetDataset()
+
+        try:
+            DDatay = np.gradient(Datay,Datax)/Datay[len(Datay)-1]
+        except ValueError:
+            pass
+        self.Terminal.append(f"Nominal Voltage: Unom = {sp.integrate.simpson(Datax, Datay)}")
+        self.sc.axes.plot(Datax[:len(Datay)], DDatay, label=f"Derivative function plot", color="green")
+        self.sc.draw()
+
     def onTextChanged(self, sender, num):
         if self.windows is not None:
             Datax, Datay = self.windows.GetDataset()
@@ -271,8 +316,27 @@ class MainWindow(QMainWindow):
     def SideBySide(self):
         self.resize_windows()
 
+    def SetXLabel(self):
+        if self.XLabel.text()is not None:
+            print(self.XLabel.text())
+            self.sc.figure.supxlabel(self.XLabel.text())
+            self.sc.draw()
+
+    def SetYLabel(self):
+        if self.YLabel.text()is not None:
+            print(self.YLabel.text())
+            self.sc.figure.supylabel(self.YLabel.text())
+            self.sc.draw()
+
+    def SetPlotTitle(self):
+        if self.PlotTitle.text()is not None:
+            print(self.PlotTitle.text())
+            self.sc.figure.suptitle(self.PlotTitle.text())
+            self.sc.draw()
+
+
     def handle_key_pressed(self, key):
-        if key in (QtCore.Qt.Key_T, QtCore.Qt.Key_Return):
+        if key in (QtCore.Qt.Key_1, QtCore.Qt.Key_Return):
             self.SideBySide()
 
     def resize_windows(self):
